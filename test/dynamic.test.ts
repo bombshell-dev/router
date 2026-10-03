@@ -1,15 +1,12 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { type } from "arktype";
+import * as z from "zod";
+import { dynamic } from "../mod.ts";
 import { command } from "../lib/command.ts";
 import { checkpoint } from "../lib/checkpoint.ts";
 import { name } from "../lib/definition.ts";
-import {
-  type ConjoinPhases,
-  dynamic,
-  type PhasesOf,
-  type Seed,
-} from "../lib/dynamic.ts";
+import type { ConjoinPhases, PhasesOf, Seed } from "../lib/dynamic.ts";
 import { extend } from "../lib/extend.ts";
 import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
@@ -33,9 +30,17 @@ import type {
   RequirementsOf,
   Route,
   RoutePath,
+  Schema,
   Version,
 } from "../lib/types.ts";
 import { toggle } from "../lib/toggle.ts";
+import { withValues } from "../lib/values.ts";
+
+const config: Schema<Config> = type({ services: "string[]" });
+
+const plugins: Schema<Plugins> = type({ names: "string[]" });
+
+const frontmatter: Schema<Frontmatter> = type({ properties: "string[]" });
 
 describe("dynamic()", () => {
   it("starts its extension with a fresh phase", () => {
@@ -86,11 +91,14 @@ describe("dynamic()", () => {
     expectType<Equal<Actual, Expected>>(true);
   });
 
-  it("infers its requirements from the resolver parameters", () => {
+  it("infers its requirements and resolver input from the schema", () => {
     let app = command(
       name("simulacrum"),
       option(name("config"), schema(type("string"))),
-      dynamic((_config: Config) => extend()),
+      dynamic(config, (value) => {
+        expectType<Equal<typeof value, Config>>(true);
+        return extend();
+      }),
     );
 
     expectType<Equal<RequirementsOf<typeof app>, readonly [Config]>>(true);
@@ -100,11 +108,10 @@ describe("dynamic()", () => {
   it("collects recursive requirements in resume order", () => {
     let app = command(
       name("simulacrum"),
-      dynamic((_config: Config) =>
+      dynamic(config, (_config: Config) =>
         extend(
-          dynamic((_plugins: Plugins) => extend()),
-        )
-      ),
+          dynamic(plugins, (_plugins: Plugins) => extend()),
+        )),
     );
 
     type Next = ContinuationOf<typeof app>;
@@ -117,16 +124,58 @@ describe("dynamic()", () => {
     expectType<Equal<RequirementOf<Next>, Plugins>>(true);
   });
 
+  it("accepts schema input and passes transformed output to its extension", () => {
+    let app = command(
+      name("server"),
+      dynamic(z.string().transform(Number), (port) => {
+        expectType<Equal<typeof port, number>>(true);
+        return extend(
+          withValues([{ name: "settings", value: { port } }]),
+          option(name("port"), schema(z.number())),
+        );
+      }),
+    );
+
+    expectType<Equal<RequirementOf<typeof app>, string>>(true);
+    expectType<Equal<ModelOf<typeof app>, { port: number }>>(true);
+
+    let first = parse(app, { argv: [] });
+    assertIncrement(first, {});
+
+    check(() => {
+      // @ts-expect-error resume accepts the schema input, not its output.
+      first.resume(4100);
+      // @ts-expect-error resume accepts a value directly.
+      first.resume({ ok: true, value: "4100" });
+    });
+
+    let result = first.resume("4100");
+    expect(result).toMatchObject({
+      ok: true,
+      method: "execute",
+      route: "/",
+      model: { port: 4100 },
+    });
+  });
+
+  it("requires a schema and a resolver accepting its output", () => {
+    check(() => {
+      // @ts-expect-error every dynamic requirement must have a schema.
+      dynamic((_value: string) => extend());
+      // @ts-expect-error the resolver receives the schema's output type.
+      dynamic(z.string().transform(Number), (_value: string) => extend());
+    });
+  });
+
   it("infers its continuation from the returned extension", () => {
     let app = command(
       name("simulacrum"),
       option(name("config"), schema(type("string"))),
-      dynamic((_config: Config) =>
+      dynamic(config, (_config: Config) =>
         extend(
           option(name("port"), schema(type("number"))),
           option(name("domain"), schema(type("string"))),
-        )
-      ),
+        )),
     );
 
     type Next = ContinuationOf<typeof app>;
@@ -156,7 +205,10 @@ describe("dynamic()", () => {
     type Plugin = typeof plugin;
     let app = command(
       name("simulacrum"),
-      dynamic((plugin: Plugin) => extend(routes(plugin))),
+      dynamic(
+        z.custom<Plugin>((value) => value === plugin),
+        (plugin: Plugin) => extend(routes(plugin)),
+      ),
     );
     type Next = ContinuationOf<typeof app>;
 
@@ -169,7 +221,7 @@ describe("dynamic()", () => {
     });
     assertIncrement(first, {});
 
-    let result = first.resume({ ok: true, value: plugin });
+    let result = first.resume(plugin);
     expect(result).toMatchObject({
       ok: true,
       method: "execute",
@@ -179,9 +231,16 @@ describe("dynamic()", () => {
   });
 
   it("preserves the resume boundary for runtime-sized command extensions", () => {
+    let serve = command(name("serve"));
+    let commands: Schema<PluginSet> = z.object({
+      commands: z.array(z.custom<AnyRoute>((value) => value === serve)),
+    });
     let app = command(
       name("simulacrum"),
-      dynamic((plugins: PluginSet) => extend(routes(...plugins.commands))),
+      dynamic(
+        commands,
+        (plugins: PluginSet) => extend(routes(...plugins.commands)),
+      ),
     );
 
     expectType<Equal<RequirementOf<typeof app>, PluginSet>>(true);
@@ -190,10 +249,7 @@ describe("dynamic()", () => {
     let first = parse(app, { argv: ["serve"] });
     assertIncrement(first, {});
 
-    let result = first.resume({
-      ok: true,
-      value: { commands: [command(name("serve"))] },
-    });
+    let result = first.resume({ commands: [serve] });
     expect(result).toMatchObject({
       ok: true,
       method: "execute",
@@ -209,12 +265,14 @@ describe("dynamic()", () => {
     let app = command(
       name("xmd"),
       option(name("path"), schema(type("string"))),
-      dynamic((declared: readonly string[]) =>
-        extend(
-          ...declared.map((property) =>
-            option(name(property), schema(type("string")))
+      dynamic(
+        z.array(z.string()).readonly(),
+        (declared: readonly string[]) =>
+          extend(
+            ...declared.map((property) =>
+              option(name(property), schema(type("string")))
+            ),
           ),
-        )
       ),
       option(name("raw"), schema(type("string | undefined"))),
       routes(serve),
@@ -237,7 +295,7 @@ describe("dynamic()", () => {
     });
     assertIncrement(first, { path: "doc.md" });
 
-    let result = first.resume({ ok: true, value: ["author"] });
+    let result = first.resume(["author"]);
     expect(result).toMatchObject({
       ok: true,
       model: { path: "doc.md", author: "Ada", raw: "true" },
@@ -267,8 +325,10 @@ describe("dynamic()", () => {
         cli(["--file"]),
         schema(type("string")),
       ),
-      dynamic((frontmatter: Frontmatter) =>
-        extend(...frontmatter.properties.map(generated))
+      dynamic(
+        frontmatter,
+        (frontmatter: Frontmatter) =>
+          extend(...frontmatter.properties.map(generated)),
       ),
       option(
         name("raw"),
@@ -285,10 +345,7 @@ describe("dynamic()", () => {
     if (!step.ok || !("resume" in step)) throw new Error("expected increment");
     expectType<Equal<typeof step.model, { file: string }>>(true);
 
-    let result = step.resume({
-      ok: true,
-      value: { properties: ["props-name"] },
-    });
+    let result = step.resume({ properties: ["props-name"] });
     if (!result.ok || result.method !== "execute") {
       throw new Error("expected execute result");
     }
@@ -307,7 +364,7 @@ describe("dynamic()", () => {
     let app = command(
       name("xmd"),
       option(name("path"), schema(type("string"))),
-      dynamic((input: unknown) => {
+      dynamic(type("unknown"), (input: unknown) => {
         let declared = Array.isArray(input)
           ? input.filter((value): value is string => typeof value === "string")
           : [];
@@ -331,7 +388,7 @@ describe("dynamic()", () => {
     });
     assertIncrement(first, { path: "doc.md" });
 
-    let result = first.resume({ ok: true, value: ["author"] });
+    let result = first.resume(["author"]);
     expect(result).toMatchObject({
       ok: true,
       model: { path: "doc.md", author: "Ada" },
@@ -343,11 +400,10 @@ describe("dynamic()", () => {
       name("simulacrum"),
       version("1.2.0"),
       option(name("config"), schema(type("string"))),
-      dynamic((_config: Config) =>
+      dynamic(config, (_config: Config) =>
         extend(
           option(name("port"), schema(type("number"))),
-        )
-      ),
+        )),
     );
 
     type Next = ContinuationOf<typeof app>;
@@ -363,7 +419,7 @@ describe("dynamic()", () => {
   it("continues composing from the conjoined route", () => {
     let app = command(
       name("simulacrum"),
-      dynamic((_config: Config) => extend()),
+      dynamic(config, (_config: Config) => extend()),
       option(name("port"), schema(type("number"))),
     );
 
@@ -385,7 +441,7 @@ describe("dynamic()", () => {
       version("1.2.0"),
       option(name("config"), schema(type("string"))),
       checkpoint(),
-      dynamic(() => routes(command(name("dyn")))),
+      dynamic(type("unknown"), () => routes(command(name("dyn")))),
       option(name("delay"), schema(type("number"))),
       routes(
         command(
@@ -420,7 +476,7 @@ describe("dynamic()", () => {
   it("rejects a resolver that does not return an extension", () => {
     check(() => {
       // @ts-expect-error a command is a definition, not a route extension.
-      dynamic((_config: Config) => command(name("serve")));
+      dynamic(config, (_config: Config) => command(name("serve")));
     });
   });
 
@@ -430,7 +486,7 @@ describe("dynamic()", () => {
         let app = command(
           name("simulacrum"),
           option(name("config"), schema(type("string"))),
-          dynamic((_config: Config) => extend()),
+          dynamic(config, (_config: Config) => extend()),
         );
         let result = parse(app, {
           argv: ["--config", "simulacrum.json"],
@@ -446,7 +502,7 @@ describe("dynamic()", () => {
         let app = command(
           name("simulacrum"),
           option(name("config"), schema(type("string"))),
-          dynamic((_config: Config) => extend()),
+          dynamic(config, (_config: Config) => extend()),
         );
         let result = parse(app, { argv: [] });
 
@@ -461,8 +517,10 @@ describe("dynamic()", () => {
         let app = command(
           name("simulacrum"),
           option(name("config"), schema(type("string"))),
-          dynamic((_config: Config) =>
-            extend(option(name("port"), schema(type("number"))))
+          dynamic(
+            config,
+            (_config: Config) =>
+              extend(option(name("port"), schema(type("number")))),
           ),
         );
         let first = parse(app, {
@@ -470,10 +528,7 @@ describe("dynamic()", () => {
         });
 
         assertIncrement(first, { config: "simulacrum.json" });
-        let result = first.resume({
-          ok: true,
-          value: { services: [] },
-        });
+        let result = first.resume({ services: [] });
 
         expect(result).toMatchObject({
           ok: true,
@@ -486,28 +541,126 @@ describe("dynamic()", () => {
         });
       });
 
-      it("turns a failed requirement into unprocessable content", () => {
+      it("turns an invalid requirement into unprocessable content", () => {
         let app = command(
           name("simulacrum"),
           option(name("config"), schema(type("string"))),
-          dynamic((_config: Config) => extend()),
+          dynamic(config, (_config: Config) => extend()),
         );
         let first = parse(app, {
           argv: ["--config", "broken.json"],
         });
 
         assertIncrement(first, { config: "broken.json" });
-        let result = first.resume({
-          ok: false,
-          issues: [{ message: "could not load broken.json" }],
-        });
+        // @ts-expect-error JavaScript callers can supply invalid requirements.
+        let result = first.resume({ services: "invalid" });
 
         expect(result).toMatchObject({
           ok: false,
           code: "unprocessable-content",
           route: "/",
           path: [],
-          issues: [{ message: "could not load broken.json" }],
+        });
+        if (result.ok || result.code !== "unprocessable-content") {
+          throw new Error("expected validation issues");
+        }
+        expect(result.issues).toHaveLength(1);
+        expect([...result.issues[0].path ?? []]).toEqual(["services"]);
+
+        expect(first.resume({ services: [] })).toMatchObject({
+          ok: true,
+          method: "execute",
+          model: { config: "broken.json" },
+        });
+      });
+
+      it("preserves schema issue paths on a child route", () => {
+        let child = command(
+          name("plugins"),
+          dynamic(
+            z.unknown().pipe(z.object({
+              plugins: z.array(z.object({ name: z.string() })),
+            })),
+            (value) =>
+              routes(command(name(value.plugins[0].name.toUpperCase()))),
+          ),
+        );
+        let app = command(name("server"), routes(child));
+        let first = parse(app, { argv: ["plugins", "--help"] });
+        assertIncrementAt(first, "/plugins");
+
+        let result = first.resume({ plugins: [{ name: 123 }] });
+        expect(result).toMatchObject({
+          ok: false,
+          code: "unprocessable-content",
+          route: "/plugins",
+          path: ["plugins"],
+          issues: [{ path: ["plugins", 0, "name"] }],
+        });
+      });
+
+      it("preserves schema validation messages", () => {
+        let app = command(
+          name("server"),
+          dynamic(
+            z.string().min(1, "plugin name is required"),
+            (value) => routes(command(name(value))),
+          ),
+        );
+        let first = parse(app, { argv: [] });
+        assertIncrement(first, {});
+
+        expect(first.resume("")).toMatchObject({
+          ok: false,
+          code: "unprocessable-content",
+          issues: [{ message: "plugin name is required", path: [] }],
+        });
+      });
+
+      it("validates result-shaped objects as ordinary input", () => {
+        let app = command(
+          name("server"),
+          dynamic(
+            z.object({ ok: z.literal(false), value: z.string() }),
+            (input) =>
+              extend(
+                withValues([{
+                  name: "settings",
+                  value: { label: input.value },
+                }]),
+                option(name("label"), schema(z.string())),
+              ),
+          ),
+        );
+        let first = parse(app, { argv: [] });
+        assertIncrement(first, {});
+
+        expect(first.resume({ ok: false, value: "ready" })).toMatchObject({
+          ok: true,
+          method: "execute",
+          model: { label: "ready" },
+        });
+      });
+
+      it("reports asynchronous schemas as unprocessable content", () => {
+        let asynchronous: Schema<string> = {
+          "~standard": {
+            version: 1,
+            vendor: "test",
+            validate: (value) => Promise.resolve({ value: String(value) }),
+          },
+        };
+        let app = command(
+          name("server"),
+          dynamic(asynchronous, (value) => routes(command(name(value)))),
+        );
+        let first = parse(app, { argv: [] });
+        assertIncrement(first, {});
+
+        expect(first.resume("serve")).toMatchObject({
+          ok: false,
+          code: "unprocessable-content",
+          issues: [{ message: "async schemas are not allowed" }],
         });
       });
     });
@@ -517,30 +670,22 @@ describe("dynamic()", () => {
         let app = command(
           name("simulacrum"),
           option(name("a"), schema(type("string"))),
-          dynamic((_config: Config) =>
+          dynamic(config, (_config: Config) =>
             extend(
               option(name("b"), schema(type("string"))),
-              dynamic((_plugins: Plugins) =>
-                extend(option(name("c"), schema(type("string"))))
-              ),
-            )
-          ),
+              dynamic(plugins, (_plugins: Plugins) =>
+                extend(option(name("c"), schema(type("string"))))),
+            )),
         );
         let first = parse(app, {
           argv: ["--a", "one", "--b", "two", "--c", "three"],
         });
 
         assertIncrement(first, { a: "one" });
-        let second = first.resume({
-          ok: true,
-          value: { services: [] },
-        });
+        let second = first.resume({ services: [] });
 
         assertIncrement(second, { b: "two" });
-        let result = second.resume({
-          ok: true,
-          value: { names: [] },
-        });
+        let result = second.resume({ names: [] });
 
         expect(result).toMatchObject({
           ok: true,
@@ -554,8 +699,10 @@ describe("dynamic()", () => {
         let app = command(
           name("simulacrum"),
           option(name("a"), schema(type("string"))),
-          dynamic((_config: Config) =>
-            extend(option(name("b"), schema(type("string"))))
+          dynamic(
+            config,
+            (_config: Config) =>
+              extend(option(name("b"), schema(type("string")))),
           ),
         );
         let first = parse(app, {
@@ -563,10 +710,7 @@ describe("dynamic()", () => {
         });
 
         assertIncrement(first, { a: "one" });
-        let result = first.resume({
-          ok: true,
-          value: { services: [] },
-        });
+        let result = first.resume({ services: [] });
 
         expect(result).toMatchObject({
           ok: false,
@@ -585,7 +729,7 @@ describe("dynamic()", () => {
         let clean = command(
           name("clean"),
           toggle(name("truncate")),
-          dynamic(() => extend(routes(auth0))),
+          dynamic(type("unknown"), () => extend(routes(auth0))),
         );
         let app = command(name("simulacrum"), routes(clean));
         let increment = parse(app, {
@@ -610,10 +754,7 @@ describe("dynamic()", () => {
         expectType<Equal<Actual, Expected>>(true);
         assertIncrementAt(increment, "/clean");
 
-        let result = increment.resume({
-          ok: true,
-          value: { names: ["auth0"] },
-        });
+        let result = increment.resume({ names: ["auth0"] });
         expect(result).toMatchObject({
           method: "execute",
           route: "/clean/auth0",
@@ -630,7 +771,7 @@ describe("dynamic()", () => {
         let clean = command(
           name("clean"),
           toggle(name("verbose")),
-          dynamic((_plugins: Plugins) => extend(routes(auth0))),
+          dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
         );
         let app = command(name("simulacrum"), routes(clean));
         let increment = parse(app, {
@@ -643,10 +784,7 @@ describe("dynamic()", () => {
         });
         assertIncrementAt(increment, "/clean");
 
-        let result = increment.resume({
-          ok: true,
-          value: { names: ["auth0"] },
-        });
+        let result = increment.resume({ names: ["auth0"] });
 
         expect(result).toMatchObject({
           method: "execute",
@@ -663,12 +801,11 @@ describe("dynamic()", () => {
         let auth0 = command(name("auth0"));
         let clean = command(
           name("clean"),
-          dynamic((_plugins: Plugins) =>
+          dynamic(plugins, (_plugins: Plugins) =>
             extend(
               toggle(name("audit")),
               routes(auth0),
-            )
-          ),
+            )),
         );
         let app = command(name("simulacrum"), routes(clean));
         let increment = parse(app, {
@@ -681,10 +818,7 @@ describe("dynamic()", () => {
         });
         assertIncrementAt(increment, "/clean");
 
-        let result = increment.resume({
-          ok: true,
-          value: { names: ["auth0"] },
-        });
+        let result = increment.resume({ names: ["auth0"] });
 
         expect(result).toMatchObject({
           method: "execute",
@@ -701,12 +835,11 @@ describe("dynamic()", () => {
         let auth0 = command(name("auth0"));
         let clean = command(
           name("clean"),
-          dynamic((_plugins: Plugins) =>
+          dynamic(plugins, (_plugins: Plugins) =>
             extend(
               option(name("target"), schema(type("string"))),
               routes(auth0),
-            )
-          ),
+            )),
         );
         let app = command(name("simulacrum"), routes(clean));
         let increment = parse(app, {
@@ -714,10 +847,7 @@ describe("dynamic()", () => {
         });
 
         assertIncrementAt(increment, "/clean");
-        let result = increment.resume({
-          ok: true,
-          value: { names: ["auth0"] },
-        });
+        let result = increment.resume({ names: ["auth0"] });
 
         expect(result).toMatchObject({
           ok: false,
@@ -731,12 +861,11 @@ describe("dynamic()", () => {
         let auth0 = command(name("auth0"), toggle(name("audit")));
         let clean = command(
           name("clean"),
-          dynamic((_plugins: Plugins) =>
+          dynamic(plugins, (_plugins: Plugins) =>
             extend(
               toggle(name("audit")),
               routes(auth0),
-            )
-          ),
+            )),
         );
         let app = command(name("simulacrum"), routes(clean));
         let increment = parse(app, {
@@ -749,10 +878,7 @@ describe("dynamic()", () => {
         });
         assertIncrementAt(increment, "/clean");
 
-        let result = increment.resume({
-          ok: true,
-          value: { names: ["auth0"] },
-        });
+        let result = increment.resume({ names: ["auth0"] });
 
         expect(result).toMatchObject({
           method: "execute",
@@ -768,7 +894,7 @@ describe("dynamic()", () => {
       it("defers an unknown token until the route frame is final", () => {
         let clean = command(
           name("clean"),
-          dynamic((_plugins: Plugins) => extend()),
+          dynamic(plugins, (_plugins: Plugins) => extend()),
         );
         let app = command(name("simulacrum"), routes(clean));
         let increment = parse(app, { argv: ["clean", "auth0"] });
@@ -779,10 +905,7 @@ describe("dynamic()", () => {
         });
         assertIncrementAt(increment, "/clean");
 
-        let result = increment.resume({
-          ok: true,
-          value: { names: [] },
-        });
+        let result = increment.resume({ names: [] });
 
         expect(result).toMatchObject({
           ok: false,
@@ -798,13 +921,19 @@ describe("dynamic()", () => {
         let clean = command(
           name("clean"),
           toggle(name("truncate")),
-          dynamic((_child: { readonly child: true }) => extend()),
+          dynamic(
+            type({ child: "true" }),
+            (_child: { readonly child: true }) => extend(),
+          ),
         );
         let app = command(
           name("simulacrum"),
           option(name("config"), schema(type("string"))),
           routes(clean),
-          dynamic((_root: { readonly root: true }) => extend()),
+          dynamic(
+            type({ root: "true" }),
+            (_root: { readonly root: true }) => extend(),
+          ),
         );
         let root = parse(app, {
           argv: ["--config", "app.json", "clean", "--truncate"],
@@ -813,10 +942,7 @@ describe("dynamic()", () => {
         type Root = Extract<typeof root, { readonly ok: true }>;
         expectType<Equal<Root, ParseIncrement<typeof app>>>(true);
         assertIncrement(root, { config: "app.json" });
-        let child = root.resume({
-          ok: true,
-          value: { root: true },
-        });
+        let child = root.resume({ root: true });
 
         expect(child).toMatchObject({
           route: "/clean",
@@ -836,10 +962,7 @@ describe("dynamic()", () => {
         expectType<Equal<Actual, Expected>>(true);
         assertIncrementAt(child, "/clean");
 
-        let result = child.resume({
-          ok: true,
-          value: { child: true },
-        });
+        let result = child.resume({ child: true });
 
         expect(result).toMatchObject({
           ok: true,
@@ -858,15 +981,12 @@ describe("dynamic()", () => {
         let auth0 = command(name("auth0"));
         let app = command(
           name("simulacrum"),
-          dynamic((_plugins: Plugins) => extend(routes(auth0))),
+          dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
         );
         let first = parse(app, { argv: ["auth0", "--help"] });
 
         assertIncrement(first, {});
-        let result = first.resume({
-          ok: true,
-          value: { names: ["auth0"] },
-        });
+        let result = first.resume({ names: ["auth0"] });
 
         expect(result).toMatchObject({
           ok: true,
@@ -878,15 +998,12 @@ describe("dynamic()", () => {
       it("waits for all root phases before returning root help", () => {
         let app = command(
           name("simulacrum"),
-          dynamic((_plugins: Plugins) => extend()),
+          dynamic(plugins, (_plugins: Plugins) => extend()),
         );
         let first = parse(app, { argv: ["--help"] });
 
         assertIncrement(first, {});
-        let result = first.resume({
-          ok: true,
-          value: { names: [] },
-        });
+        let result = first.resume({ names: [] });
 
         expect(result).toMatchObject({
           ok: true,
@@ -899,17 +1016,14 @@ describe("dynamic()", () => {
         let app = route(
           name("simulacrum"),
           option(name("config")),
-          dynamic((_plugins: Plugins) => option(name("dyno"))),
+          dynamic(plugins, (_plugins: Plugins) => option(name("dyno"))),
           option(name("delay")),
           routes(command(name("serve"))),
         );
         let first = parse(app, { argv: ["--help"] });
 
         assertIncrement(first, { config: undefined });
-        let result = first.resume({
-          ok: true,
-          value: { names: [] },
-        });
+        let result = first.resume({ names: [] });
 
         expect(result).toMatchObject({
           ok: true,
@@ -939,15 +1053,12 @@ Options:
         let release = route(name("release"), version("2.0.0"));
         let app = command(
           name("simulacrum"),
-          dynamic((_plugins: Plugins) => extend(routes(release))),
+          dynamic(plugins, (_plugins: Plugins) => extend(routes(release))),
         );
         let first = parse(app, { argv: ["release", "--version"] });
 
         assertIncrement(first, {});
-        let result = first.resume({
-          ok: true,
-          value: { names: ["release"] },
-        });
+        let result = first.resume({ names: ["release"] });
 
         expect(result).toMatchObject({
           ok: true,
@@ -960,15 +1071,12 @@ Options:
         let serve = command(name("serve"));
         let app = command(
           name("simulacrum"),
-          dynamic((_plugins: Plugins) => extend(routes(serve))),
+          dynamic(plugins, (_plugins: Plugins) => extend(routes(serve))),
         );
         let first = parse(app, { argv: ["serve"] });
 
         assertIncrement(first, {});
-        let result = first.resume({
-          ok: true,
-          value: { names: ["serve"] },
-        });
+        let result = first.resume({ names: ["serve"] });
 
         expect(result).toMatchObject({
           ok: true,

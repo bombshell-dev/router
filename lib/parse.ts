@@ -168,20 +168,21 @@ function advance(
         route: segment.id,
         model: binding.model,
 
-        resume(result) {
-          if (!result.ok) {
-            return unprocessableContent(segment, result.issues);
-          }
-
+        resume(value) {
           // AnyPhase erases these exact types with `never`; dynamic() already
           // proved them at its public boundary.
           let resolver = phase.resolver as unknown as (
             requirement: unknown,
-          ) => (route: AnyRoute) => AnyRoute;
+          ) => Result<(route: AnyRoute) => AnyRoute>;
+
+          let result = resolver(value);
+          if (!result.ok) {
+            return unprocessableContent(segment, result.issues);
+          }
 
           // The extension operates against the same aggregate route metadata,
           // but begins with one fresh, empty phase.
-          let continuation = resolver(result.value)(
+          let continuation = result.value(
             seed(segment.route),
           );
           let phases = stitch(
@@ -260,7 +261,7 @@ interface AnyIncrement {
   readonly ok: true;
   readonly route: RoutePath;
   readonly model: object;
-  resume(result: Result<unknown>): Outcome<AnyIntent | AnyIncrement>;
+  resume(value: unknown): Outcome<AnyIntent | AnyIncrement>;
 }
 
 interface Segment {

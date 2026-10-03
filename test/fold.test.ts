@@ -22,8 +22,16 @@ import type {
   ModelOf,
   RequirementOf,
   Route,
+  Schema,
 } from "../lib/types.ts";
 import { type ValueSource, withValues } from "../lib/values.ts";
+
+const sources: Schema<readonly ValueSource[]> = type({
+  name: "string",
+  value: "unknown",
+}).array();
+
+const plugins: Schema<Plugins> = type({ auth0: "boolean" });
 
 const staticApp = command(
   name("simulacrum"),
@@ -43,7 +51,10 @@ const staticApp = command(
 const configApp = command(
   name("server"),
   option(name("config"), schema(type("string"))),
-  dynamic((sources: readonly ValueSource[]) => extend(withValues(sources))),
+  dynamic(
+    sources,
+    (sources: readonly ValueSource[]) => extend(withValues(sources)),
+  ),
   option(name("port"), schema(type("number"))),
 );
 
@@ -301,8 +312,9 @@ describe("pipeline fold", () => {
   it("accepts an atomic dynamic continuation", () => {
     let app = command(
       name("atomic"),
-      dynamic((_plugins: Plugins) =>
-        option(name("dyno"), schema(type("number")))
+      dynamic(
+        plugins,
+        (_plugins: Plugins) => option(name("dyno"), schema(type("number"))),
       ),
     );
 
@@ -490,8 +502,9 @@ describe("pipeline fold", () => {
     let phased = extend(
       option(name("before"), schema(type("number"))),
       identity,
-      dynamic((_plugins: Plugins) =>
-        option(name("dynamic"), schema(type("string")))
+      dynamic(
+        plugins,
+        (_plugins: Plugins) => option(name("dynamic"), schema(type("string"))),
       ),
       option(name("after"), schema(type("boolean"))),
     );
@@ -601,8 +614,9 @@ describe("pipeline fold", () => {
   it("composes nested dynamic batches through an identity macro", () => {
     let identity = extend();
     let nested = extend(
-      dynamic((_plugins: Plugins) =>
-        option(name("dynamic"), schema(type("number")))
+      dynamic(
+        plugins,
+        (_plugins: Plugins) => option(name("dynamic"), schema(type("number"))),
       ),
       withValues([]),
     );
@@ -701,8 +715,9 @@ describe("pipeline fold", () => {
     });
 
     check(() => {
-      // @ts-expect-error a resolver must return a route extension.
       dynamic(
+        plugins,
+        // @ts-expect-error a resolver must return a route extension.
         (_plugins: Plugins) => command(name("auth0")),
       );
     });
@@ -739,10 +754,7 @@ describe("pipeline fold", () => {
       throw new Error("expected a parse increment");
     }
 
-    let result = first.resume({
-      ok: true,
-      value: [{ name: "server.json", value: { port: 9001 } }],
-    });
+    let result = first.resume([{ name: "server.json", value: { port: 9001 } }]);
 
     expect(result).toMatchObject({
       ok: true,

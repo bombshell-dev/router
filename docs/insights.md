@@ -114,9 +114,12 @@ The detailed phase-binding design is recorded in [Binding](./binding.md).
 - A dynamic resolver returns an extension at its current pipeline position.
 - The extension's return type determines the continuation type.
 - `resume()` continues parsing; it never exposes the intermediate route.
-- `resume()` accepts `Result<Requirement>`, allowing loader failures through the
-  ordinary issue path.
-- A failed requirement never invokes the resolver.
+- `dynamic(schema, extension)` requires a Standard Schema for its requirement.
+- `resume()` accepts the schema's input directly; synchronous validation
+  supplies the schema's output to the extension, including transforms.
+- An invalid requirement returns `unprocessable-content` with the schema's
+  issues and never invokes the extension. Async schemas are rejected through the
+  same issue path; the application handles I/O failures before resuming.
 - `RequirementsOf<R>` preserves requirement order; `RequirementOf<R>` is its
   head.
 - `ContinuationOf<R>` settles the current unresolved phase and retains it as

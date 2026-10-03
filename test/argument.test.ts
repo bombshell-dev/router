@@ -314,11 +314,10 @@ describe("argument()", () => {
       let app = command(
         name("app"),
         option(name("config"), schema(type("string"))),
-        dynamic(() =>
+        dynamic(type("unknown"), () =>
           extend(
             argument(name("input"), schema(type("string"))),
-          )
-        ),
+          )),
       );
       let increment = parse(app, {
         argv: ["--config", "app.json", "input.txt"],
@@ -331,7 +330,7 @@ describe("argument()", () => {
       });
       assertIncrement(increment);
 
-      let result = increment.resume({ ok: true, value: undefined });
+      let result = increment.resume(undefined);
       expect(result).toMatchObject({
         ok: true,
         method: "execute",
@@ -344,11 +343,10 @@ describe("argument()", () => {
       let app = command(
         name("app"),
         argument(name("target"), schema(type("string"))),
-        dynamic(() =>
+        dynamic(type("unknown"), () =>
           extend(
             routes(command(name("auth0"))),
-          )
-        ),
+          )),
       );
       let increment = parse(app, { argv: ["auth0"] });
 
@@ -359,7 +357,7 @@ describe("argument()", () => {
       });
       assertIncrement(increment);
 
-      let result = increment.resume({ ok: true, value: undefined });
+      let result = increment.resume(undefined);
       expect(result).toMatchObject({
         ok: true,
         method: "execute",
@@ -379,7 +377,7 @@ function expectType<T extends true>(_value: T): void {}
 function assertIncrement(
   result: unknown,
 ): asserts result is {
-  resume(result: { readonly ok: true; readonly value: undefined }): unknown;
+  resume(value: undefined): unknown;
 } {
   expect(result).toMatchObject({ ok: true });
   expect(

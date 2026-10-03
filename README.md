@@ -195,6 +195,32 @@ Dynamic phases serve two common cases:
 route-extension mechanism. Both keep I/O in the application while preserving the
 exact type of what parsing can produce next.
 
+`dynamic(schema, extension)` requires a Standard Schema for the value supplied
+to `resume()`. The schema's input type determines what `resume()` accepts; its
+validated output is passed to the extension, including any schema transforms.
+
+```ts
+import { command, dynamic, name, parse, routes } from "@bomb.sh/router";
+import * as z from "zod";
+
+const app = command(
+  name("plugins"),
+  dynamic(
+    z.array(z.string()),
+    (plugins) => routes(...plugins.map((plugin) => command(name(plugin)))),
+  ),
+);
+
+const step = parse(app, { argv: ["serve"] });
+if (step.ok) {
+  const result = step.resume(["serve"]); // EXECUTE /serve
+}
+```
+
+Invalid input produces `unprocessable-content` with the schema's issues and
+paths, without applying the extension. Validation must be synchronous; async
+schemas also produce `unprocessable-content`.
+
 ### Help and version cross checkpoints
 
 `--help` and `--version` request methods; they do not settle an intent or bypass
@@ -216,12 +242,12 @@ app --config app.json auth0 --help
 
 Help and version are not escape hatches around configuration loading. Do not
 inspect `argv` to skip a checkpoint. A phase may be required by `HELP`,
-`VERSION`, or `EXECUTE`, so its driver work must be safe for all three: return
-loading and validation failures as `Result` issues, avoid command side effects,
-and defer execution until an `EXECUTE` intent. If discovery fails, report that
-failure rather than printing incomplete help for an unresolved route graph.
-Routes without dynamic phases still resolve directly; the rule is to stop only
-at an intent or failure, never merely because the arguments look informational.
+`VERSION`, or `EXECUTE`, so its driver work must be safe for all three: handle
+loading failures in the application, avoid command side effects, and defer
+execution until an `EXECUTE` intent. If discovery fails, report that failure
+rather than printing incomplete help for an unresolved route graph. Routes
+without dynamic phases still resolve directly; the rule is to stop only at an
+intent or failure, never merely because the arguments look informational.
 
 ```ts
 import process from "node:process";
@@ -234,7 +260,6 @@ import {
   printErrors,
   printHelp,
   printVersion,
-  type Result,
   schema,
   type ValueSource,
   version,
@@ -280,13 +305,15 @@ switch (result.method) {
     break;
 }
 
-declare function load(path: string): Promise<Result<ValueSource[]>>;
+declare function load(path: string): Promise<ValueSource[]>;
 ```
 
 The parser remains synchronous and performs no I/O. The caller loads the file
-and resumes with a `Result`; loader failures enter the ordinary issue path.
-Unconsumed CLI input survives the pause, so a later `--port 5000` can override
-the value loaded from the file.
+and resumes directly with a value-source array. `checkpoint()` validates the
+source names and the presence of their values; later parameter schemas validate
+the contents. The application handles I/O failures before resuming. Unconsumed
+CLI input survives the pause, so a later `--port 5000` can override the value
+loaded from the file.
 
 The same phase mechanism can add options or routes from runtime data. Parsing
 then continues against the expanded route graph, and the continuation type

@@ -346,7 +346,7 @@ describe("multiple()", () => {
     let app = command(
       name("simulacrum"),
       option(name("config"), multiple(), schema(z.array(z.string()))),
-      dynamic(() => extend(routes(child))),
+      dynamic(type("unknown"), () => extend(routes(child))),
     );
     let first = parse(app, {
       argv: [
@@ -366,7 +366,7 @@ describe("multiple()", () => {
     expect("resume" in first).toBe(true);
     if (!("resume" in first)) return;
 
-    let result = first.resume({ ok: true, value: undefined });
+    let result = first.resume(undefined);
 
     expect(result).toMatchObject({
       ok: true,

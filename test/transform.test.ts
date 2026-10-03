@@ -118,7 +118,7 @@ describe("transform()", () => {
     expect("resume" in first).toBe(true);
     if (!("resume" in first)) return;
 
-    let result = first.resume({ ok: true, value: [] });
+    let result = first.resume([]);
 
     expect(result).toMatchObject({ ok: true, method: "execute" });
     if (!("model" in result)) return;
