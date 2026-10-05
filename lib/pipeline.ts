@@ -11,7 +11,7 @@ import type {
   Route,
 } from "./types.ts";
 
-export type Element<D extends Delta> = {
+export type Element<D = unknown> = {
   readonly [operation]: D;
 };
 

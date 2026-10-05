@@ -54,7 +54,7 @@ export type Next<
   readonly envs: readonly EnvSource[];
   readonly resolver: (
     requirement: T,
-  ) => (input: AnyRoute) => AnyRoute;
+  ) => Result<(input: AnyRoute) => AnyRoute>;
 };
 
 export type Done<
@@ -86,7 +86,7 @@ export interface ParseIncrement<
   readonly model: IncrementModelOf<R>;
 
   resume(
-    result: Result<RequirementOf<R>>,
+    value: RequirementOf<R>,
   ): Outcome<ParseAt<ContinuationOf<R>, P, Models>>;
 }
 
@@ -127,7 +127,9 @@ export interface AnyPhase {
   readonly routes: readonly AnyRoute[];
   readonly values: readonly ValueSource[];
   readonly envs: readonly EnvSource[];
-  readonly resolver?: (requirement: never) => (route: never) => AnyRoute;
+  readonly resolver?: (
+    requirement: never,
+  ) => Result<(route: never) => AnyRoute>;
 }
 
 export type AnyPhases = readonly [AnyPhase, ...AnyPhase[]];
@@ -304,7 +306,7 @@ type NextModelIn<P extends readonly AnyPhase[]> = P extends readonly [
 type RequirementIn<P extends AnyPhase> = P extends {
   readonly resolver: (
     requirement: infer Requirement,
-  ) => (route: AnyRoute) => AnyRoute;
+  ) => Result<(route: AnyRoute) => AnyRoute>;
 } ? Requirement
   : never;
 

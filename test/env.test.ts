@@ -11,7 +11,9 @@ import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
 import { route, routes } from "../lib/route.ts";
 import { toggle } from "../lib/toggle.ts";
-import type { ModelOf } from "../lib/types.ts";
+import type { ModelOf, Schema } from "../lib/types.ts";
+
+const plugins: Schema<Plugins> = z.object({ names: z.array(z.string()) });
 
 describe("environment binding", () => {
   describe("mapping", () => {
@@ -570,11 +572,10 @@ describe("environment binding", () => {
     it("keeps input environment sources available to later parameters", () => {
       let app = command(
         name("simulacrum"),
-        dynamic((_plugins: Plugins) =>
+        dynamic(plugins, (_plugins: Plugins) =>
           extend(
             option(name("domain"), schema(z.string())),
-          )
-        ),
+          )),
       );
       let increment = parse(app, {
         argv: [],
@@ -585,10 +586,7 @@ describe("environment binding", () => {
       });
 
       assertIncrement(increment);
-      let result = increment.resume({
-        ok: true,
-        value: { names: ["auth0"] },
-      });
+      let result = increment.resume({ names: ["auth0"] });
 
       expect(result).toMatchObject({
         ok: true,
@@ -605,7 +603,7 @@ describe("environment binding", () => {
       );
       let app = command(
         name("simulacrum"),
-        dynamic((_plugins: Plugins) => extend(routes(auth0))),
+        dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
       );
       let increment = parse(app, {
         argv: ["auth0"],
@@ -616,10 +614,7 @@ describe("environment binding", () => {
       });
 
       assertIncrement(increment);
-      let result = increment.resume({
-        ok: true,
-        value: { names: ["auth0"] },
-      });
+      let result = increment.resume({ names: ["auth0"] });
 
       expect(result).toMatchObject({
         ok: true,
@@ -632,33 +627,25 @@ describe("environment binding", () => {
     it("keeps dynamically introduced environment sources available downstream", () => {
       let app = command(
         name("simulacrum"),
-        dynamic((_plugins: Plugins) =>
+        dynamic(plugins, (_plugins: Plugins) =>
           extend(
             withEnvs([{
               name: "settings",
               value: { DOMAIN: "auth0.local" },
             }]),
-            dynamic((_services: Plugins) =>
+            dynamic(plugins, (_services: Plugins) =>
               extend(
                 option(name("domain"), schema(z.string())),
-              )
-            ),
-          )
-        ),
+              )),
+          )),
       );
       let first = parse(app, { argv: [] });
 
       assertIncrement(first);
-      let second = first.resume({
-        ok: true,
-        value: { names: ["config"] },
-      });
+      let second = first.resume({ names: ["config"] });
 
       assertIncrement(second);
-      let result = second.resume({
-        ok: true,
-        value: { names: ["auth0"] },
-      });
+      let result = second.resume({ names: ["auth0"] });
 
       expect(result).toMatchObject({
         ok: true,
@@ -673,7 +660,7 @@ describe("environment binding", () => {
       let app = command(
         name("simulacrum"),
         option(name("config"), schema(z.string())),
-        dynamic((_plugins: Plugins) => extend(routes(auth0))),
+        dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
       );
       let increment = parse(app, {
         argv: ["auth0", "--help"],
@@ -684,10 +671,7 @@ describe("environment binding", () => {
       });
 
       assertIncrement(increment, { config: "plugins.json" });
-      let result = increment.resume({
-        ok: true,
-        value: { names: ["auth0"] },
-      });
+      let result = increment.resume({ names: ["auth0"] });
 
       expect(result).toMatchObject({
         ok: true,

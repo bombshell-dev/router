@@ -9,8 +9,10 @@ import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
 import { routes } from "../lib/route.ts";
-import type { Parse } from "../lib/types.ts";
+import type { Parse, Schema } from "../lib/types.ts";
 import { withValues } from "../lib/values.ts";
+
+const plugins: Schema<Plugins> = type({ names: "string[]" });
 
 describe("value sources", () => {
   it("binds top-level properties to root parameters", () => {
@@ -345,7 +347,7 @@ describe("value sources", () => {
       name("simulacrum"),
       option(name("port"), schema(type("number"))),
       option(name("target"), schema(type("string"))),
-      dynamic((_plugins: Plugins) => extend(routes(auth0))),
+      dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
     );
     let increment = parse(app, {
       argv: ["--target", "local", "auth0", "--port", "9001"],
@@ -363,10 +365,7 @@ describe("value sources", () => {
       },
     });
 
-    let result = increment.resume({
-      ok: true,
-      value: { names: ["auth0"] },
-    });
+    let result = increment.resume({ names: ["auth0"] });
 
     expect(result).toMatchObject({
       ok: true,
@@ -386,11 +385,10 @@ describe("value sources", () => {
   it("keeps values available to parameters introduced by a later phase", () => {
     let app = command(
       name("simulacrum"),
-      dynamic((_plugins: Plugins) =>
+      dynamic(plugins, (_plugins: Plugins) =>
         extend(
           option(name("domain"), schema(type("string"))),
-        )
-      ),
+        )),
     );
     let input = {
       argv: [],
@@ -402,10 +400,7 @@ describe("value sources", () => {
     let increment = parse(app, input);
 
     assertIncrement(increment);
-    let result = increment.resume({
-      ok: true,
-      value: { names: ["auth0"] },
-    });
+    let result = increment.resume({ names: ["auth0"] });
 
     expect(result).toMatchObject({
       ok: true,
@@ -421,33 +416,25 @@ describe("value sources", () => {
   it("keeps dynamically introduced values available downstream", () => {
     let app = command(
       name("simulacrum"),
-      dynamic((_plugins: Plugins) =>
+      dynamic(plugins, (_plugins: Plugins) =>
         extend(
           withValues([{
             name: "settings",
             value: { domain: "auth0.local" },
           }]),
-          dynamic((_services: Plugins) =>
+          dynamic(plugins, (_services: Plugins) =>
             extend(
               option(name("domain"), schema(type("string"))),
-            )
-          ),
-        )
-      ),
+            )),
+        )),
     );
     let first = parse(app, { argv: [] });
 
     assertIncrement(first);
-    let second = first.resume({
-      ok: true,
-      value: { names: ["config"] },
-    });
+    let second = first.resume({ names: ["config"] });
 
     assertIncrement(second);
-    let result = second.resume({
-      ok: true,
-      value: { names: ["auth0"] },
-    });
+    let result = second.resume({ names: ["auth0"] });
 
     expect(result).toMatchObject({
       ok: true,
