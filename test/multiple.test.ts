@@ -6,7 +6,6 @@ import { dynamic } from "../lib/dynamic.ts";
 import { extend } from "../lib/extend.ts";
 import type { AnyParam, Param } from "../lib/param.ts";
 import { brand, type IdentityElement } from "../lib/pipeline.ts";
-import { routes } from "../lib/route.ts";
 import {
   command,
   type ModelOf,
@@ -315,7 +314,7 @@ describe("multiple()", () => {
     let app = command(
       name("simulacrum"),
       option(name("config"), multiple(), schema(z.array(z.string()))),
-      routes(child),
+      child,
     );
     let result = parse(app, {
       argv: [
@@ -346,7 +345,7 @@ describe("multiple()", () => {
     let app = command(
       name("simulacrum"),
       option(name("config"), multiple(), schema(z.array(z.string()))),
-      dynamic(type("unknown"), () => extend(routes(child))),
+      dynamic(type("unknown"), () => extend(child)),
     );
     let first = parse(app, {
       argv: [

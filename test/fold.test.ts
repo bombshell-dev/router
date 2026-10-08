@@ -11,7 +11,7 @@ import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
 import { mark, type Transform } from "../lib/pipeline.ts";
-import { route, routes, version } from "../lib/route.ts";
+import { route, version } from "../lib/route.ts";
 import { toggle } from "../lib/toggle.ts";
 import type {
   AnyRoute,
@@ -40,11 +40,9 @@ const staticApp = command(
   withEnvs([]),
   version("1.2.0"),
   toggle(name("verbose")),
-  routes(
-    command(
-      name("serve"),
-      option(name("port"), schema(type("number"))),
-    ),
+  command(
+    name("serve"),
+    option(name("port"), schema(type("number"))),
   ),
 );
 
@@ -169,106 +167,106 @@ const options = [
 ] as const;
 
 const children = [
-  routes(command(name("c0"))),
-  routes(command(name("c1"))),
-  routes(command(name("c2"))),
-  routes(command(name("c3"))),
-  routes(command(name("c4"))),
-  routes(command(name("c5"))),
-  routes(command(name("c6"))),
-  routes(command(name("c7"))),
-  routes(command(name("c8"))),
-  routes(command(name("c9"))),
-  routes(command(name("c10"))),
-  routes(command(name("c11"))),
-  routes(command(name("c12"))),
-  routes(command(name("c13"))),
-  routes(command(name("c14"))),
-  routes(command(name("c15"))),
-  routes(command(name("c16"))),
-  routes(command(name("c17"))),
-  routes(command(name("c18"))),
-  routes(command(name("c19"))),
-  routes(command(name("c20"))),
-  routes(command(name("c21"))),
-  routes(command(name("c22"))),
-  routes(command(name("c23"))),
-  routes(command(name("c24"))),
-  routes(command(name("c25"))),
-  routes(command(name("c26"))),
-  routes(command(name("c27"))),
-  routes(command(name("c28"))),
-  routes(command(name("c29"))),
-  routes(command(name("c30"))),
-  routes(command(name("c31"))),
-  routes(command(name("c32"))),
-  routes(command(name("c33"))),
-  routes(command(name("c34"))),
-  routes(command(name("c35"))),
-  routes(command(name("c36"))),
-  routes(command(name("c37"))),
-  routes(command(name("c38"))),
-  routes(command(name("c39"))),
-  routes(command(name("c40"))),
-  routes(command(name("c41"))),
-  routes(command(name("c42"))),
-  routes(command(name("c43"))),
-  routes(command(name("c44"))),
-  routes(command(name("c45"))),
-  routes(command(name("c46"))),
-  routes(command(name("c47"))),
-  routes(command(name("c48"))),
-  routes(command(name("c49"))),
-  routes(command(name("c50"))),
-  routes(command(name("c51"))),
-  routes(command(name("c52"))),
-  routes(command(name("c53"))),
-  routes(command(name("c54"))),
-  routes(command(name("c55"))),
-  routes(command(name("c56"))),
-  routes(command(name("c57"))),
-  routes(command(name("c58"))),
-  routes(command(name("c59"))),
-  routes(command(name("c60"))),
-  routes(command(name("c61"))),
-  routes(command(name("c62"))),
-  routes(command(name("c63"))),
-  routes(command(name("c64"))),
-  routes(command(name("c65"))),
-  routes(command(name("c66"))),
-  routes(command(name("c67"))),
-  routes(command(name("c68"))),
-  routes(command(name("c69"))),
-  routes(command(name("c70"))),
-  routes(command(name("c71"))),
-  routes(command(name("c72"))),
-  routes(command(name("c73"))),
-  routes(command(name("c74"))),
-  routes(command(name("c75"))),
-  routes(command(name("c76"))),
-  routes(command(name("c77"))),
-  routes(command(name("c78"))),
-  routes(command(name("c79"))),
-  routes(command(name("c80"))),
-  routes(command(name("c81"))),
-  routes(command(name("c82"))),
-  routes(command(name("c83"))),
-  routes(command(name("c84"))),
-  routes(command(name("c85"))),
-  routes(command(name("c86"))),
-  routes(command(name("c87"))),
-  routes(command(name("c88"))),
-  routes(command(name("c89"))),
-  routes(command(name("c90"))),
-  routes(command(name("c91"))),
-  routes(command(name("c92"))),
-  routes(command(name("c93"))),
-  routes(command(name("c94"))),
-  routes(command(name("c95"))),
-  routes(command(name("c96"))),
-  routes(command(name("c97"))),
-  routes(command(name("c98"))),
-  routes(command(name("c99"))),
+  command(name("c0")),
+  command(name("c1")),
+  command(name("c2")),
+  command(name("c3")),
+  command(name("c4")),
+  command(name("c5")),
+  command(name("c6")),
+  command(name("c7")),
+  command(name("c8")),
+  command(name("c9")),
+  command(name("c10")),
+  command(name("c11")),
+  command(name("c12")),
+  command(name("c13")),
+  command(name("c14")),
+  command(name("c15")),
+  command(name("c16")),
+  command(name("c17")),
+  command(name("c18")),
+  command(name("c19")),
+  command(name("c20")),
+  command(name("c21")),
+  command(name("c22")),
+  command(name("c23")),
+  command(name("c24")),
+  command(name("c25")),
+  command(name("c26")),
+  command(name("c27")),
+  command(name("c28")),
+  command(name("c29")),
+  command(name("c30")),
+  command(name("c31")),
+  command(name("c32")),
+  command(name("c33")),
+  command(name("c34")),
+  command(name("c35")),
+  command(name("c36")),
+  command(name("c37")),
+  command(name("c38")),
+  command(name("c39")),
+  command(name("c40")),
+  command(name("c41")),
+  command(name("c42")),
+  command(name("c43")),
+  command(name("c44")),
+  command(name("c45")),
+  command(name("c46")),
+  command(name("c47")),
+  command(name("c48")),
+  command(name("c49")),
+  command(name("c50")),
+  command(name("c51")),
+  command(name("c52")),
+  command(name("c53")),
+  command(name("c54")),
+  command(name("c55")),
+  command(name("c56")),
+  command(name("c57")),
+  command(name("c58")),
+  command(name("c59")),
+  command(name("c60")),
+  command(name("c61")),
+  command(name("c62")),
+  command(name("c63")),
+  command(name("c64")),
+  command(name("c65")),
+  command(name("c66")),
+  command(name("c67")),
+  command(name("c68")),
+  command(name("c69")),
+  command(name("c70")),
+  command(name("c71")),
+  command(name("c72")),
+  command(name("c73")),
+  command(name("c74")),
+  command(name("c75")),
+  command(name("c76")),
+  command(name("c77")),
+  command(name("c78")),
+  command(name("c79")),
+  command(name("c80")),
+  command(name("c81")),
+  command(name("c82")),
+  command(name("c83")),
+  command(name("c84")),
+  command(name("c85")),
+  command(name("c86")),
+  command(name("c87")),
+  command(name("c88")),
+  command(name("c89")),
+  command(name("c90")),
+  command(name("c91")),
+  command(name("c92")),
+  command(name("c93")),
+  command(name("c94")),
+  command(name("c95")),
+  command(name("c96")),
+  command(name("c97")),
+  command(name("c98")),
+  command(name("c99")),
 ] as const;
 
 const hundredCommand = command(name("hundred"), ...options);
@@ -276,6 +274,8 @@ const hundredRoute = route(name("hundred"), ...options);
 const hundredExtension = extend(...options);
 const extendedRoute = route(name("extended"), hundredExtension);
 const hundredChildren = route(name("children"), ...children);
+const extendedChildren = command(name("children"), extend(...children));
+const mixedChildren = command(name("mixed"), ...options, ...children);
 
 describe("pipeline fold", () => {
   it("infers a concrete static route", () => {
@@ -453,7 +453,7 @@ describe("pipeline fold", () => {
       withValues([]),
       withEnvs([]),
       version("1.0.0"),
-      routes(command(name("child"))),
+      command(name("child")),
       identity,
       option(name("port"), schema(type("number"))),
     );
@@ -597,7 +597,7 @@ describe("pipeline fold", () => {
   it("composes nested built-in batches through an identity macro", () => {
     let identity = extend();
     let nested = extend(
-      routes(command(name("child"))),
+      command(name("child")),
       withValues([]),
     );
     let hybrid = extend(
@@ -633,7 +633,22 @@ describe("pipeline fold", () => {
     >(true);
   });
 
-  it("folds one hundred child-route elements", () => {
+  it("folds one hundred direct children through routes, commands, and extensions", () => {
+    expectType<
+      Equal<
+        ChildrenOf<typeof extendedChildren>,
+        ChildrenOf<typeof hundredChildren>
+      >
+    >(true);
+    expectType<
+      Equal<
+        ChildrenOf<typeof mixedChildren>,
+        ChildrenOf<typeof hundredChildren>
+      >
+    >(true);
+    expectType<
+      Equal<ModelOf<typeof mixedChildren>, ModelOf<typeof hundredCommand>>
+    >(true);
     expectType<Equal<ChildrenOf<typeof hundredChildren>[0]["name"], "c0">>(
       true,
     );
@@ -684,7 +699,7 @@ describe("pipeline fold", () => {
   it("types union-valued elements conservatively", () => {
     let element = Math.random() > 0.5
       ? option(name("port"), schema(type("number")))
-      : routes(route(name("child")));
+      : extend(route(name("child")));
     let app = route(name("union"), element);
 
     expectType<Equal<typeof app, AnyRoute>>(true);

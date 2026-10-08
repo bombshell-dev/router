@@ -5,7 +5,6 @@ import {
   name,
   option,
   route,
-  routes,
   schema,
   toggle,
   version,
@@ -18,30 +17,26 @@ export const app = command(
   description("Run and manage local service simulators."),
   version("1.0.0"),
   toggle(name("verbose")),
-  routes(
-    command(
-      name("serve"),
-      option(name("port"), description("server port"), schema(z.number())),
-      checkpoint(),
-      option(name("host"), description("server host"), schema(z.string())),
-      option(
-        name("protocol"),
-        description("server protocol"),
-        schema(z.enum(["http", "https"])),
-      ),
+  command(
+    name("serve"),
+    option(name("port"), description("server port"), schema(z.number())),
+    checkpoint(),
+    option(name("host"), description("server host"), schema(z.string())),
+    option(
+      name("protocol"),
+      description("server protocol"),
+      schema(z.enum(["http", "https"])),
     ),
-    route(
-      name("database"),
-      routes(
-        command(
-          name("clean"),
-          toggle(name("dryRun")),
-          option(
-            name("output"),
-            description("output path"),
-            schema(z.string()),
-          ),
-        ),
+  ),
+  route(
+    name("database"),
+    command(
+      name("clean"),
+      toggle(name("dryRun")),
+      option(
+        name("output"),
+        description("output path"),
+        schema(z.string()),
       ),
     ),
   ),

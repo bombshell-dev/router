@@ -12,7 +12,7 @@ import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
 import { printErrors, printHelp, printVersion } from "../lib/print.ts";
-import { route, routes, version } from "../lib/route.ts";
+import { route, version } from "../lib/route.ts";
 import { toggle } from "../lib/toggle.ts";
 
 let app = route(
@@ -27,33 +27,29 @@ let app = route(
     name("verbose"),
     description("Show detailed startup and request diagnostics."),
   ),
-  routes(
-    route(
-      name("database"),
-      description("Inspect and maintain simulator state."),
-      routes(
-        command(
-          name("clean"),
-          description("Remove generated records and reset database state."),
-          version("2.0.0"),
-          option(
-            name("schema"),
-            description("Limit cleanup to a single database schema."),
-          ),
-          toggle(
-            name("dryRun"),
-            description("Show what would be removed without changing data."),
-          ),
-        ),
+  route(
+    name("database"),
+    description("Inspect and maintain simulator state."),
+    command(
+      name("clean"),
+      description("Remove generated records and reset database state."),
+      version("2.0.0"),
+      option(
+        name("schema"),
+        description("Limit cleanup to a single database schema."),
+      ),
+      toggle(
+        name("dryRun"),
+        description("Show what would be removed without changing data."),
       ),
     ),
-    command(
-      name("serve"),
-      description("Start every configured simulator."),
-      option(
-        name("port"),
-        description("Listen on this port."),
-      ),
+  ),
+  command(
+    name("serve"),
+    description("Start every configured simulator."),
+    option(
+      name("port"),
+      description("Listen on this port."),
     ),
   ),
 );

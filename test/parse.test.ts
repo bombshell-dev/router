@@ -6,7 +6,7 @@ import { name } from "../lib/definition.ts";
 import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
-import { route, routes, version } from "../lib/route.ts";
+import { route, version } from "../lib/route.ts";
 import { toggle } from "../lib/toggle.ts";
 import type { AnyRoute, Done, IntentsOf, Route } from "../lib/types.ts";
 
@@ -14,28 +14,22 @@ let app = route(
   name("simulacrum"),
   version("1.2.0"),
   option(name("port"), schema(type("number"))),
-  routes(
-    route(name("auth0")),
-    route(
-      name("database"),
-      routes(route(name("clean"))),
-    ),
+  route(name("auth0")),
+  route(
+    name("database"),
+    route(name("clean")),
   ),
 );
 
 let tree = command(
   name("simulacrum"),
   toggle(name("verbose")),
-  routes(
+  command(
+    name("database"),
+    toggle(name("verbose")),
     command(
-      name("database"),
+      name("clean"),
       toggle(name("verbose")),
-      routes(
-        command(
-          name("clean"),
-          toggle(name("verbose")),
-        ),
-      ),
     ),
   ),
 );
@@ -58,11 +52,9 @@ let options = command(
 let segments = command(
   name("simulacrum"),
   option(name("host"), schema(type("string"))),
-  routes(
-    command(
-      name("serve"),
-      option(name("port"), schema(type("number"))),
-    ),
+  command(
+    name("serve"),
+    option(name("port"), schema(type("number"))),
   ),
 );
 
@@ -448,19 +440,15 @@ const plain = cli(route(name("simulacrum")));
 const scoped = cli(
   route(
     name("simulacrum"),
-    routes(
-      route(name("auth0"), version("2.0.0")),
-    ),
+    route(name("auth0"), version("2.0.0")),
   ),
 );
 const commands = cli(
   command(
     name("simulacrum"),
-    routes(
-      command(
-        name("database"),
-        routes(command(name("clean"))),
-      ),
+    command(
+      name("database"),
+      command(name("clean")),
     ),
   ),
 );

@@ -9,7 +9,6 @@ import {
   name,
   option,
   parse,
-  routes,
   schema,
   toggle,
 } from "@bomb.sh/router";
@@ -168,7 +167,7 @@ describe("argument()", () => {
       let app = command(
         name("app"),
         argument(name("workspace"), schema(type("string"))),
-        routes(auth0),
+        auth0,
       );
       let result = parse(app, {
         argv: ["local", "auth0", "service.json"],
@@ -191,7 +190,7 @@ describe("argument()", () => {
       let app = command(
         name("app"),
         argument(name("workspace"), schema(type("string | undefined"))),
-        routes(auth0),
+        auth0,
       );
       let result = parse(app, { argv: ["auth0"] });
 
@@ -345,7 +344,7 @@ describe("argument()", () => {
         argument(name("target"), schema(type("string"))),
         dynamic(type("unknown"), () =>
           extend(
-            routes(command(name("auth0"))),
+            command(name("auth0")),
           )),
       );
       let increment = parse(app, { argv: ["auth0"] });

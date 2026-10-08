@@ -1,11 +1,16 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { type } from "arktype";
+import * as z from "zod";
+import { command } from "../lib/command.ts";
+import { dynamic } from "../lib/dynamic.ts";
+import { extend } from "../lib/extend.ts";
+import { parse } from "../lib/parse.ts";
 import { description, name } from "../lib/definition.ts";
 import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { mark, type Transform } from "../lib/pipeline.ts";
-import { route, routes, type RouteZero, version } from "../lib/route.ts";
+import { route, type RouteZero, version } from "../lib/route.ts";
 import { toggle } from "../lib/toggle.ts";
 import type { AnyRoute, ChildrenOf, Done, ModelOf } from "../lib/types.ts";
 
@@ -108,7 +113,7 @@ describe("route() types", () => {
     );
     let result = route(
       name("simulacrum"),
-      routes(serve),
+      serve,
     );
 
     expectType<
@@ -230,6 +235,160 @@ describe("route() types", () => {
         }
       >
     >(true);
+  });
+});
+
+describe("direct child composition", () => {
+  it("preserves nested paths, methods, and models", () => {
+    let clean = command(name("clean"), toggle(name("dryRun")));
+    let database = route(name("database"), clean);
+    let serve = command(
+      name("serve"),
+      option(name("port"), schema(type("number"))),
+      version("1.0.0"),
+    );
+    let app = command(
+      name("app"),
+      toggle(name("verbose")),
+      database,
+      extend(route(name("status"))),
+      serve,
+    );
+    let wrapped = command(
+      name("app"),
+      toggle(name("verbose")),
+      extend(route(name("database"), extend(clean))),
+      extend(route(name("status"))),
+      extend(serve),
+    );
+
+    expectType<Equal<typeof app, typeof wrapped>>(true);
+    let result = parse(app, {
+      argv: ["--verbose", "database", "clean", "--dry-run"],
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      method: "execute",
+      route: "/database/clean",
+      model: { dryRun: true },
+      models: {
+        "/": { verbose: true },
+        "/database": {},
+        "/database/clean": { dryRun: true },
+      },
+    });
+    if (!result.ok || result.method !== "execute") {
+      throw Error("expected execute");
+    }
+    if (result.route === "/database/clean") {
+      expectType<Equal<typeof result.model, { dryRun: boolean }>>(true);
+    }
+    if (result.route === "/serve") {
+      expectType<Equal<typeof result.model, { port: number }>>(true);
+    }
+    expect(parse(app, { argv: ["database", "--help"] })).toMatchObject({
+      ok: true,
+      method: "help",
+      route: "/database",
+    });
+    expect(parse(app, { argv: ["serve", "--version"] })).toMatchObject({
+      ok: true,
+      method: "version",
+      route: "/serve",
+    });
+    expect(parse(app, { argv: ["database"] })).toMatchObject({
+      ok: false,
+      code: "method-not-allowed",
+      route: "/database",
+    });
+  });
+
+  it("packages children in reusable extensions and applies them directly", () => {
+    let child = command(name("child"), toggle(name("enabled")));
+    let extension = extend(child, toggle(name("verbose")));
+    let app = extension(command(name("app")));
+    let nested = route(name("app"), route(name("group"), extension));
+
+    expectType<Equal<ModelOf<typeof app>, { verbose: boolean }>>(true);
+    expectType<
+      Equal<ModelOf<typeof nested, "/group/child">, { enabled: boolean }>
+    >(true);
+    expect(parse(app, { argv: ["--verbose", "child", "--enabled"] }))
+      .toMatchObject({
+        ok: true,
+        method: "execute",
+        route: "/child",
+        models: { "/": { verbose: true }, "/child": { enabled: true } },
+      });
+    expect(parse(nested, { argv: ["group", "child"] })).toMatchObject({
+      ok: true,
+      method: "execute",
+      route: "/group/child",
+      model: { enabled: false },
+    });
+  });
+
+  it("introduces children through a dynamic extension", () => {
+    let app = command(
+      name("app"),
+      dynamic(type("number"), (port) =>
+        extend(
+          command(
+            name("serve"),
+            option(name("port"), schema(z.number().default(port))),
+          ),
+        )),
+      command(name("clean")),
+    );
+    let first = parse(app, { argv: ["serve"] });
+    if (!first.ok) throw Error("expected increment");
+    let result = first.resume(4000);
+    expect(result).toMatchObject({
+      ok: true,
+      method: "execute",
+      route: "/serve",
+      model: { port: 4000 },
+    });
+    if (!result.ok || result.method !== "execute") {
+      throw Error("expected execute");
+    }
+    if (result.route === "/serve") {
+      expectType<Equal<typeof result.model, { port: number }>>(true);
+    }
+    let clean = parse(app, { argv: ["clean"] });
+    if (!clean.ok) throw Error("expected increment");
+    expect(clean.resume(4000)).toMatchObject({
+      ok: true,
+      method: "execute",
+      route: "/clean",
+      model: {},
+    });
+  });
+
+  it("retains conservative inference for arrays and unions", () => {
+    let children = [command(name("child"))];
+    let app = route(name("app"), ...children);
+    expectType<Equal<typeof app, AnyRoute>>(true);
+    let child = Math.random() > 0.5 ? command(name("one")) : route(name("two"));
+    let union = command(name("app"), child);
+    expectType<Equal<typeof union, AnyRoute>>(true);
+  });
+
+  it("rejects children after non-route outputs and in parameter pipelines", () => {
+    let child = command(name("child"));
+    let count = (_value: AnyRoute) => 1;
+    check(() => {
+      // @ts-expect-error a child cannot be mounted on a number.
+      route(name("app"), count, child);
+      // @ts-expect-error a child cannot be mounted on a number.
+      command(name("app"), count, child);
+      // @ts-expect-error options accept parameter transformations.
+      option(name("port"), child);
+      // @ts-expect-error a child extension requires a route.
+      option(name("port"), extend(child));
+      // @ts-expect-error the parameter schema cannot follow a child operation.
+      route(name("app"), child, schema(type("number")));
+    });
   });
 });
 

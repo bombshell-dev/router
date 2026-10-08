@@ -9,7 +9,7 @@ import { extend } from "../lib/extend.ts";
 import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
-import { route, routes } from "../lib/route.ts";
+import { route } from "../lib/route.ts";
 import { toggle } from "../lib/toggle.ts";
 import type { ModelOf, Schema } from "../lib/types.ts";
 
@@ -40,8 +40,8 @@ describe("environment binding", () => {
         name("clean"),
         option(name("dryRun"), schema(z.string())),
       );
-      let database = route(name("database"), routes(clean));
-      let app = command(name("simulacrum"), routes(database));
+      let database = route(name("database"), clean);
+      let app = command(name("simulacrum"), database);
       let result = parse(app, {
         argv: ["database", "clean"],
         envs: [{
@@ -63,7 +63,7 @@ describe("environment binding", () => {
         name("pg:clean"),
         option(name("clientID"), schema(z.string())),
       );
-      let app = command(name("simulacrum"), routes(clean));
+      let app = command(name("simulacrum"), clean);
       let result = parse(app, {
         argv: ["pg:clean"],
         envs: [{
@@ -476,7 +476,7 @@ describe("environment binding", () => {
           name: "settings",
           value: { AUTH0_PORT: "9001" },
         }]),
-        routes(auth0),
+        auth0,
       );
       let result = parse(app, { argv: ["auth0"] });
 
@@ -503,7 +503,7 @@ describe("environment binding", () => {
           name: "settings",
           value: { AUTH0_PORT: "9001" },
         }]),
-        routes(auth0),
+        auth0,
       );
       let result = parse(app, { argv: ["auth0"] });
 
@@ -531,7 +531,7 @@ describe("environment binding", () => {
           env("PORT"),
           schema(z.number()),
         ),
-        routes(auth0),
+        auth0,
       );
       let result = parse(app, {
         argv: ["auth0"],
@@ -603,7 +603,7 @@ describe("environment binding", () => {
       );
       let app = command(
         name("simulacrum"),
-        dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
+        dynamic(plugins, (_plugins: Plugins) => extend(auth0)),
       );
       let increment = parse(app, {
         argv: ["auth0"],
@@ -660,7 +660,7 @@ describe("environment binding", () => {
       let app = command(
         name("simulacrum"),
         option(name("config"), schema(z.string())),
-        dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
+        dynamic(plugins, (_plugins: Plugins) => extend(auth0)),
       );
       let increment = parse(app, {
         argv: ["auth0", "--help"],
