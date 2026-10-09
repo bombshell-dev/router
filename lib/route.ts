@@ -1,7 +1,6 @@
 // deno-lint-ignore-file ban-types
 import {
   brand,
-  type Check,
   type Fold,
   type Materialize,
   type MethodElement,
@@ -18,11 +17,11 @@ export type RouteZero<N extends string = string> = Route<
 
 export function route<
   const N extends string,
-  const E extends readonly Unary[],
+  const E extends readonly Input[],
 >(
   start: Definition<N>,
-  ...elements: E & Check<RouteZero<N>, E>
-): Materialize<Fold<RouteZero<N>, E>> {
+  ...elements: E & Validate<RouteZero<N>, E>
+): Materialize<Fold<RouteZero<N>, Normalize<E>>> {
   let zero: RouteZero<N> = {
     ...start,
     methods: ["help"],
@@ -37,10 +36,10 @@ export function route<
     }],
   };
 
-  return elements.reduce<unknown>(
+  return normalize<E>(elements).reduce<unknown>(
     (value, element) => element(value as never),
     zero,
-  ) as Materialize<Fold<RouteZero<N>, E>>;
+  ) as Materialize<Fold<RouteZero<N>, Normalize<E>>>;
 }
 
 export function version(semver: string): MethodElement<"version"> {
@@ -58,7 +57,25 @@ export function executable(): MethodElement<"execute"> {
   }));
 }
 
-export function routes<const C extends readonly AnyRoute[]>(
+export type Input = Unary | AnyRoute;
+
+export type Normalize<E extends readonly Input[]> = {
+  [K in keyof E]: Normalized<E[K]>;
+};
+
+// Walk invalid pipelines only, reporting errors on the original arguments.
+export type Validate<S, E extends readonly Input[]> =
+  [Fold<S, Normalize<E>>] extends [never] ? Invalid<S, E> : unknown;
+
+export function normalize<const E extends readonly Input[]>(
+  elements: E,
+): Normalize<E> {
+  return elements.map((element) =>
+    typeof element === "function" ? element : routes(element)
+  ) as Normalize<E>;
+}
+
+function routes<const C extends readonly AnyRoute[]>(
   ...children: C
 ): RoutesElement<C> {
   return brand<RoutesElement<C>>((route: AnyRoute) => {
@@ -75,3 +92,18 @@ export function routes<const C extends readonly AnyRoute[]>(
     };
   });
 }
+
+// Distribute over unions so Fold can retain its conservative union handling.
+type Normalized<E extends Input> = E extends Unary ? E
+  : E extends AnyRoute ? RoutesElement<readonly [E]>
+  : never;
+
+type Invalid<S, E extends readonly Input[]> = E extends readonly [
+  infer Head extends Input,
+  ...infer Tail extends readonly Input[],
+]
+  ? Fold<S, readonly [Normalized<Head>]> extends infer Next
+    ? [Next] extends [never] ? readonly [never, ...Tail]
+    : readonly [Head, ...Invalid<Next, Tail>]
+  : never
+  : E;

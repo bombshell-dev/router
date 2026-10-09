@@ -13,7 +13,7 @@ import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
 import { printHelp } from "../lib/print.ts";
 import { cli } from "../lib/read.ts";
-import { route, routes, version } from "../lib/route.ts";
+import { route, version } from "../lib/route.ts";
 import type {
   AnyRoute,
   ChildrenOf,
@@ -207,7 +207,7 @@ describe("dynamic()", () => {
       name("simulacrum"),
       dynamic(
         z.custom<Plugin>((value) => value === plugin),
-        (plugin: Plugin) => extend(routes(plugin)),
+        (plugin: Plugin) => extend(plugin),
       ),
     );
     type Next = ContinuationOf<typeof app>;
@@ -239,7 +239,7 @@ describe("dynamic()", () => {
       name("simulacrum"),
       dynamic(
         commands,
-        (plugins: PluginSet) => extend(routes(...plugins.commands)),
+        (plugins: PluginSet) => extend(...plugins.commands),
       ),
     );
 
@@ -275,7 +275,7 @@ describe("dynamic()", () => {
           ),
       ),
       option(name("raw"), schema(type("string | undefined"))),
-      routes(serve),
+      serve,
     );
 
     expectType<Equal<RequirementOf<typeof app>, readonly string[]>>(true);
@@ -441,13 +441,11 @@ describe("dynamic()", () => {
       version("1.2.0"),
       option(name("config"), schema(type("string"))),
       checkpoint(),
-      dynamic(type("unknown"), () => routes(command(name("dyn")))),
+      dynamic(type("unknown"), () => extend(command(name("dyn")))),
       option(name("delay"), schema(type("number"))),
-      routes(
-        command(
-          name("serve"),
-          option(name("port"), schema(type("number"))),
-        ),
+      command(
+        name("serve"),
+        option(name("port"), schema(type("number"))),
       ),
     );
 
@@ -582,10 +580,10 @@ describe("dynamic()", () => {
               plugins: z.array(z.object({ name: z.string() })),
             })),
             (value) =>
-              routes(command(name(value.plugins[0].name.toUpperCase()))),
+              extend(command(name(value.plugins[0].name.toUpperCase()))),
           ),
         );
-        let app = command(name("server"), routes(child));
+        let app = command(name("server"), child);
         let first = parse(app, { argv: ["plugins", "--help"] });
         assertIncrementAt(first, "/plugins");
 
@@ -604,7 +602,7 @@ describe("dynamic()", () => {
           name("server"),
           dynamic(
             z.string().min(1, "plugin name is required"),
-            (value) => routes(command(name(value))),
+            (value) => extend(command(name(value))),
           ),
         );
         let first = parse(app, { argv: [] });
@@ -652,7 +650,7 @@ describe("dynamic()", () => {
         };
         let app = command(
           name("server"),
-          dynamic(asynchronous, (value) => routes(command(name(value)))),
+          dynamic(asynchronous, (value) => extend(command(name(value)))),
         );
         let first = parse(app, { argv: [] });
         assertIncrement(first, {});
@@ -729,9 +727,9 @@ describe("dynamic()", () => {
         let clean = command(
           name("clean"),
           toggle(name("truncate")),
-          dynamic(type("unknown"), () => extend(routes(auth0))),
+          dynamic(type("unknown"), () => extend(auth0)),
         );
-        let app = command(name("simulacrum"), routes(clean));
+        let app = command(name("simulacrum"), clean);
         let increment = parse(app, {
           argv: ["clean", "--truncate", "auth0"],
         });
@@ -771,9 +769,9 @@ describe("dynamic()", () => {
         let clean = command(
           name("clean"),
           toggle(name("verbose")),
-          dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
+          dynamic(plugins, (_plugins: Plugins) => extend(auth0)),
         );
-        let app = command(name("simulacrum"), routes(clean));
+        let app = command(name("simulacrum"), clean);
         let increment = parse(app, {
           argv: ["clean", "auth0", "--verbose"],
         });
@@ -804,10 +802,10 @@ describe("dynamic()", () => {
           dynamic(plugins, (_plugins: Plugins) =>
             extend(
               toggle(name("audit")),
-              routes(auth0),
+              auth0,
             )),
         );
-        let app = command(name("simulacrum"), routes(clean));
+        let app = command(name("simulacrum"), clean);
         let increment = parse(app, {
           argv: ["clean", "--audit", "auth0"],
         });
@@ -838,10 +836,10 @@ describe("dynamic()", () => {
           dynamic(plugins, (_plugins: Plugins) =>
             extend(
               option(name("target"), schema(type("string"))),
-              routes(auth0),
+              auth0,
             )),
         );
-        let app = command(name("simulacrum"), routes(clean));
+        let app = command(name("simulacrum"), clean);
         let increment = parse(app, {
           argv: ["clean", "--target", "auth0"],
         });
@@ -864,10 +862,10 @@ describe("dynamic()", () => {
           dynamic(plugins, (_plugins: Plugins) =>
             extend(
               toggle(name("audit")),
-              routes(auth0),
+              auth0,
             )),
         );
-        let app = command(name("simulacrum"), routes(clean));
+        let app = command(name("simulacrum"), clean);
         let increment = parse(app, {
           argv: ["clean", "auth0", "--audit"],
         });
@@ -896,7 +894,7 @@ describe("dynamic()", () => {
           name("clean"),
           dynamic(plugins, (_plugins: Plugins) => extend()),
         );
-        let app = command(name("simulacrum"), routes(clean));
+        let app = command(name("simulacrum"), clean);
         let increment = parse(app, { argv: ["clean", "auth0"] });
 
         expect(increment).toMatchObject({
@@ -929,7 +927,7 @@ describe("dynamic()", () => {
         let app = command(
           name("simulacrum"),
           option(name("config"), schema(type("string"))),
-          routes(clean),
+          clean,
           dynamic(
             type({ root: "true" }),
             (_root: { readonly root: true }) => extend(),
@@ -981,7 +979,7 @@ describe("dynamic()", () => {
         let auth0 = command(name("auth0"));
         let app = command(
           name("simulacrum"),
-          dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
+          dynamic(plugins, (_plugins: Plugins) => extend(auth0)),
         );
         let first = parse(app, { argv: ["auth0", "--help"] });
 
@@ -1018,7 +1016,7 @@ describe("dynamic()", () => {
           option(name("config")),
           dynamic(plugins, (_plugins: Plugins) => option(name("dyno"))),
           option(name("delay")),
-          routes(command(name("serve"))),
+          command(name("serve")),
         );
         let first = parse(app, { argv: ["--help"] });
 
@@ -1053,7 +1051,7 @@ Options:
         let release = route(name("release"), version("2.0.0"));
         let app = command(
           name("simulacrum"),
-          dynamic(plugins, (_plugins: Plugins) => extend(routes(release))),
+          dynamic(plugins, (_plugins: Plugins) => extend(release)),
         );
         let first = parse(app, { argv: ["release", "--version"] });
 
@@ -1071,7 +1069,7 @@ Options:
         let serve = command(name("serve"));
         let app = command(
           name("simulacrum"),
-          dynamic(plugins, (_plugins: Plugins) => extend(routes(serve))),
+          dynamic(plugins, (_plugins: Plugins) => extend(serve)),
         );
         let first = parse(app, { argv: ["serve"] });
 

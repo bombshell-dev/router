@@ -8,7 +8,6 @@ import { extend } from "../lib/extend.ts";
 import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { parse } from "../lib/parse.ts";
-import { routes } from "../lib/route.ts";
 import type { Parse, Schema } from "../lib/types.ts";
 import { withValues } from "../lib/values.ts";
 
@@ -60,7 +59,7 @@ describe("value sources", () => {
     let app = command(
       name("simulacrum"),
       option(name("delay"), schema(type("number"))),
-      routes(auth0),
+      auth0,
     );
     let input = {
       argv: ["auth0"],
@@ -326,7 +325,7 @@ describe("value sources", () => {
         name: "settings",
         value: { auth0: { port: 9001 } },
       }]),
-      routes(auth0),
+      auth0,
     );
     let result = parse(app, { argv: ["auth0"] });
 
@@ -347,7 +346,7 @@ describe("value sources", () => {
       name("simulacrum"),
       option(name("port"), schema(type("number"))),
       option(name("target"), schema(type("string"))),
-      dynamic(plugins, (_plugins: Plugins) => extend(routes(auth0))),
+      dynamic(plugins, (_plugins: Plugins) => extend(auth0)),
     );
     let increment = parse(app, {
       argv: ["--target", "local", "auth0", "--port", "9001"],
@@ -455,7 +454,7 @@ describe("value sources", () => {
     let app = command(
       name("simulacrum"),
       option(name("auth0")),
-      routes(auth0),
+      auth0,
     );
     let input = {
       argv: ["auth0"],

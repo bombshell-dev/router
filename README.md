@@ -40,7 +40,6 @@ import {
   name,
   option,
   route,
-  routes,
   schema,
   toggle,
   version,
@@ -52,19 +51,15 @@ export const app = command(
   description("Run and manage local service simulators."),
   version("1.0.0"),
   toggle(name("verbose")),
-  routes(
+  command(
+    name("serve"),
+    option(name("port"), schema(z.number().default(4000))),
+  ),
+  route(
+    name("database"),
     command(
-      name("serve"),
-      option(name("port"), schema(z.number().default(4000))),
-    ),
-    route(
-      name("database"),
-      routes(
-        command(
-          name("clean"),
-          toggle(name("dryRun")),
-        ),
-      ),
+      name("clean"),
+      toggle(name("dryRun")),
     ),
   ),
 );
@@ -78,6 +73,10 @@ HELP /serve                                    EXECUTE /serve
 HELP /database
 HELP /database/clean                           EXECUTE /database/clean
 ```
+
+Nest `route()` and `command()` directly inside another route, command, or
+`extend()`. Each child is mounted at that point in the pipeline. Use `extend()`
+to package reusable groups of children and other elements.
 
 The root name identifies the executable; it is not repeated in route IDs.
 `simulacrum serve` therefore selects `/serve`, not `/simulacrum/serve`.
@@ -200,14 +199,14 @@ to `resume()`. The schema's input type determines what `resume()` accepts; its
 validated output is passed to the extension, including any schema transforms.
 
 ```ts
-import { command, dynamic, name, parse, routes } from "@bomb.sh/router";
+import { command, dynamic, extend, name, parse } from "@bomb.sh/router";
 import * as z from "zod";
 
 const app = command(
   name("plugins"),
   dynamic(
     z.array(z.string()),
-    (plugins) => routes(...plugins.map((plugin) => command(name(plugin)))),
+    (plugins) => extend(...plugins.map((plugin) => command(name(plugin)))),
   ),
 );
 

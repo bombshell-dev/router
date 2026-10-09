@@ -35,7 +35,7 @@ export type {
   Symbol as CLISymbol,
 } from "./lib/read.ts";
 
-export { executable, route, routes, version } from "./lib/route.ts";
+export { executable, route, version } from "./lib/route.ts";
 export type { RouteZero } from "./lib/route.ts";
 
 export { toggle } from "./lib/toggle.ts";
