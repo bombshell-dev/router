@@ -16,12 +16,17 @@ export { option } from "./lib/option.ts";
 export { multiple } from "./lib/multiple.ts";
 
 export { param, schema } from "./lib/param.ts";
-export type { Param } from "./lib/param.ts";
+export type { Param, ParamModel } from "./lib/param.ts";
 
 export { parse } from "./lib/parse.ts";
 
 export { mark } from "./lib/pipeline.ts";
-export type { Transform, TransformElement } from "./lib/pipeline.ts";
+export type {
+  Extension,
+  ModelElement,
+  Transform,
+  TransformElement,
+} from "./lib/pipeline.ts";
 
 export { printErrors, printHelp, printVersion } from "./lib/print.ts";
 
