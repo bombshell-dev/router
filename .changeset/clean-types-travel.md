@@ -2,5 +2,5 @@
 "@bomb.sh/router": patch
 ---
 
-Export router extension model types from the package root for portable type
-declarations.
+Export router extension and command model types from the package root for
+portable type declarations.

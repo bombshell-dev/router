@@ -14,13 +14,22 @@ export type CommandZero<N extends string = string> = Route<
   [Done<{}, []>]
 >;
 
+/** A pipeline element accepted by {@link command}. */
+export type CommandElement = Input;
+
+/** The completed command type produced by {@link command}. */
+export type CommandResult<
+  N extends string,
+  E extends readonly CommandElement[],
+> = Materialize<Fold<CommandZero<N>, Normalize<E>>>;
+
 export function command<
   const N extends string,
-  const E extends readonly Input[],
+  const E extends readonly CommandElement[],
 >(
   start: Definition<N>,
   ...elements: E & Validate<CommandZero<N>, E>
-): Materialize<Fold<CommandZero<N>, Normalize<E>>> {
+): CommandResult<N, E> {
   let zero: CommandZero<N> = {
     ...start,
     methods: ["help", "execute"],
@@ -38,5 +47,5 @@ export function command<
   return normalize<E>(elements).reduce<unknown>(
     (value, element) => element(value as never),
     zero,
-  ) as Materialize<Fold<CommandZero<N>, Normalize<E>>>;
+  ) as CommandResult<N, E>;
 }

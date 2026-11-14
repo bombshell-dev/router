@@ -2,7 +2,11 @@ export { argument } from "./lib/argument.ts";
 
 export { extend } from "./lib/extend.ts";
 export { command } from "./lib/command.ts";
-export type { CommandZero } from "./lib/command.ts";
+export type {
+  CommandElement,
+  CommandResult,
+  CommandZero,
+} from "./lib/command.ts";
 
 export { checkpoint } from "./lib/checkpoint.ts";
 export { dynamic } from "./lib/dynamic.ts";
