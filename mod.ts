@@ -2,7 +2,7 @@ export { argument } from "./lib/argument.ts";
 
 export { extend } from "./lib/extend.ts";
 export { command } from "./lib/command.ts";
-export type { CommandZero } from "./lib/command.ts";
+export type { Command } from "./lib/command.ts";
 
 export { checkpoint } from "./lib/checkpoint.ts";
 export { dynamic } from "./lib/dynamic.ts";
@@ -16,12 +16,17 @@ export { option } from "./lib/option.ts";
 export { multiple } from "./lib/multiple.ts";
 
 export { param, schema } from "./lib/param.ts";
-export type { Param } from "./lib/param.ts";
+export type { Param, ParamModel } from "./lib/param.ts";
 
 export { parse } from "./lib/parse.ts";
 
 export { mark } from "./lib/pipeline.ts";
-export type { Transform, TransformElement } from "./lib/pipeline.ts";
+export type {
+  Extension,
+  ModelElement,
+  Transform,
+  TransformElement,
+} from "./lib/pipeline.ts";
 
 export { printErrors, printHelp, printVersion } from "./lib/print.ts";
 

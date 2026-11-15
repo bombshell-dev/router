@@ -1,12 +1,12 @@
 import { expect } from "@std/expect";
 import { describe, it } from "@std/testing/bdd";
 import { type } from "arktype";
-import { command } from "../lib/command.ts";
+import { type Command, command } from "../lib/command.ts";
 import { name } from "../lib/definition.ts";
 import { option } from "../lib/option.ts";
 import { schema } from "../lib/param.ts";
 import { version } from "../lib/route.ts";
-import type { Done, ModelOf } from "../lib/types.ts";
+import type { ModelOf } from "../lib/types.ts";
 
 describe("command()", () => {
   it("creates an executable route without an explicit executable element", () => {
@@ -34,8 +34,16 @@ describe("command()", () => {
     expectType<
       Equal<
         typeof result.phases,
-        readonly [Done<{ port: number; domain: string }, []>]
+        readonly [Command.Done<{ port: number; domain: string }, []>]
       >
+    >(true);
+    expectType<
+      typeof result extends Command<
+        typeof result.name,
+        typeof result.methods[number],
+        typeof result.phases
+      > ? true
+        : false
     >(true);
   });
 
